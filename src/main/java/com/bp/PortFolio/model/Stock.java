@@ -18,6 +18,9 @@ public class Stock {
     @Column(nullable = false)
     private double purchasePrice;
 
+    @Column(nullable = false)
+    private double currentPrice;
+
     private LocalDate purchaseDate;
 
     @Column(length = 1000)
@@ -56,6 +59,14 @@ public class Stock {
         this.purchasePrice = purchasePrice;
     }
 
+    public double getCurrentPrice() {
+        return currentPrice;
+    }
+
+    public void setCurrentPrice(double currentPrice) {
+        this.currentPrice = currentPrice;
+    }
+
     public LocalDate getPurchaseDate() {
         return purchaseDate;
     }
@@ -70,5 +81,18 @@ public class Stock {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    // Calculated properties
+    public double getTotalValue() {
+        return quantity * currentPrice;
+    }
+
+    public double getGainLoss() {
+        return (currentPrice - purchasePrice) * quantity;
+    }
+
+    public double getGainLossPercentage() {
+        return ((currentPrice - purchasePrice) / purchasePrice) * 100;
     }
 }

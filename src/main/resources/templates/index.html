@@ -105,7 +105,7 @@
                     <i class="bi bi-plus-circle"></i> Add New Stock
                 </h5>
                 <form method="post" action="/api/stocks" id="stockForm" class="form-container"
-                    onsubmit="return validateForm()">
+                    onsubmit="return handleFormSubmit(event)">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label required">Ticker</label>
@@ -253,6 +253,21 @@
 
                 updateChartsTheme();
             });
+        }
+
+        // Loading state management
+        function showLoading() {
+            const spinner = document.getElementById('loadingSpinner');
+            if (spinner) {
+                spinner.classList.remove('d-none');
+            }
+        }
+
+        function hideLoading() {
+            const spinner = document.getElementById('loadingSpinner');
+            if (spinner) {
+                spinner.classList.add('d-none');
+            }
         }
 
         // Initialize charts with error handling
@@ -447,7 +462,7 @@
         }
 
         // Show notification
-        function showNotification(message, type = 'info') {
+        function showNotification(message, type = 'success') {
             const toast = document.getElementById('notification');
             const toastBody = toast.querySelector('.toast-body');
             const toastHeader = toast.querySelector('.toast-header');
@@ -530,37 +545,105 @@
             scrollTimeout = setTimeout(loadMoreStocks, 100);
         });
 
-        // Delete stock
-        function deleteStock(id) {
-            if (confirm('Are you sure you want to delete this stock?')) {
-                showLoading();
-                fetch(`/api/stocks/${id}`, {
-                    method: 'DELETE'
-                }).then(() => {
-                    showNotification('Stock deleted successfully');
-                    window.location.reload();
-                }).finally(() => hideLoading());
+        // Form submission handler with improved error handling
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = document.getElementById('stockForm');
+
+            if (!form.checkValidity()) {
+                showNotification('Please fill in all required fields correctly.', 'error');
+                return false;
             }
+
+            showLoading();
+            const formData = new FormData(form);
+            const method = form.querySelector('input[name="_method"]')?.value || 'POST';
+            const url = form.action;
+
+            // Remove the _method field from FormData as we'll use the actual method
+            formData.delete('_method');
+
+            fetch(url, {
+                method: method,
+                body: formData
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to save stock');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Parse the response URL from the redirect
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const redirectUrl = doc.querySelector('meta[http-equiv="refresh"]')?.content?.split(';')[1]?.trim()?.split('=')[1];
+
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    } else {
+                        window.location.reload();
+                    }
+                })
+                .catch(error => {
+                    showNotification('Error: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    hideLoading();
+                });
+
+            return false;
         }
 
         // Edit stock
         function editStock(id) {
             showLoading();
             fetch(`/api/stocks/${id}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch stock details');
+                    }
+                    return response.json();
+                })
                 .then(stock => {
-                    document.querySelector('input[name="ticker"]').value = stock.ticker;
-                    document.querySelector('input[name="quantity"]').value = stock.quantity;
-                    document.querySelector('input[name="purchasePrice"]').value = stock.purchasePrice;
-                    document.querySelector('input[name="purchaseDate"]').value = stock.purchaseDate;
-                    document.querySelector('textarea[name="notes"]').value = stock.notes;
-
                     const form = document.getElementById('stockForm');
+
+                    // Format the date for the input field
+                    const purchaseDate = new Date(stock.purchaseDate);
+                    const formattedDate = purchaseDate.toISOString().split('T')[0];
+
+                    // Populate form fields
+                    form.querySelector('input[name="ticker"]').value = stock.ticker;
+                    form.querySelector('input[name="quantity"]').value = stock.quantity;
+                    form.querySelector('input[name="purchasePrice"]').value = stock.purchasePrice;
+                    form.querySelector('input[name="purchaseDate"]').value = formattedDate;
+                    form.querySelector('textarea[name="notes"]').value = stock.notes || '';
+
+                    // Change form action and method
                     form.action = `/api/stocks/${id}`;
                     form.method = 'PUT';
 
+                    // Add cancel button if not exists
+                    if (!document.getElementById('cancelButton')) {
+                        const submitButton = form.querySelector('button[type="submit"]');
+                        const cancelButton = document.createElement('button');
+                        cancelButton.type = 'button';
+                        cancelButton.id = 'cancelButton';
+                        cancelButton.className = 'btn btn-secondary ms-2';
+                        cancelButton.innerHTML = '<i class="bi bi-x-lg"></i> Cancel';
+                        cancelButton.onclick = resetForm;
+                        submitButton.parentNode.insertBefore(cancelButton, submitButton.nextSibling);
+                    }
+
+                    // Update submit button text
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    submitButton.innerHTML = '<i class="bi bi-check-lg"></i> Update Stock';
+
                     showNotification('Editing stock: ' + stock.ticker, 'info');
                     window.scrollTo({ top: form.offsetTop, behavior: 'smooth' });
+                })
+                .catch(error => {
+                    showNotification('Error: ' + error.message, 'error');
                 })
                 .finally(() => hideLoading());
         }
@@ -570,22 +653,71 @@
             form.reset();
             form.action = '/api/stocks';
             form.method = 'POST';
+
+            // Remove hidden method field
+            const hiddenInput = form.querySelector('input[name="_method"]');
+            if (hiddenInput) {
+                hiddenInput.remove();
+            }
+
+            // Remove cancel button
             const cancelButton = document.getElementById('cancelButton');
             if (cancelButton) {
                 cancelButton.remove();
             }
+
+            // Reset submit button text
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="bi bi-plus-lg"></i> Add Stock';
+
+            showNotification('Form reset', 'info');
         }
 
-        // Form validation
-        function validateForm() {
-            const form = document.getElementById('stockForm');
-            if (!form.checkValidity()) {
-                showNotification('Please fill in all required fields correctly.', 'danger');
-                return false;
+        // Delete stock
+        function deleteStock(id) {
+            if (confirm('Are you sure you want to delete this stock?')) {
+                showLoading();
+                fetch(`/api/stocks/${id}`, {
+                    method: 'DELETE'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to delete stock');
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        // Parse the response URL from the redirect
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const redirectUrl = doc.querySelector('meta[http-equiv="refresh"]')?.content?.split(';')[1]?.trim()?.split('=')[1];
+
+                        if (redirectUrl) {
+                            window.location.href = redirectUrl;
+                        } else {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('Error: ' + error.message, 'error');
+                    })
+                    .finally(() => hideLoading());
             }
-            showLoading();
-            return true;
         }
+
+        // Check for success/error messages in URL
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const success = urlParams.get('success');
+            const error = urlParams.get('error');
+
+            if (success) {
+                showNotification(success, 'success');
+            }
+            if (error) {
+                showNotification(error, 'error');
+            }
+        });
     </script>
 </body>
 
