@@ -36,6 +36,11 @@ public class StockController {
         return "welcome";
     }
 
+    @GetMapping("/loading")
+    public String loading() {
+        return "loading";
+    }
+
     @GetMapping("/dashboard")
     public String index(Model model) {
         try {
@@ -167,31 +172,26 @@ public class StockController {
                             stockRepository.delete(stock);
                             stockRepository.flush();
                             return ResponseEntity.ok().body(Map.of(
-                                "success", true,
-                                "message", "Stock deleted successfully"
-                            ));
+                                    "success", true,
+                                    "message", "Stock deleted successfully"));
                         } catch (Exception e) {
                             if (e.getCause() != null && e.getCause().getMessage().contains("locked")) {
                                 return ResponseEntity.status(423).body(Map.of(
-                                    "success", false,
-                                    "message", "Database is locked. Please try again in a few seconds."
-                                ));
+                                        "success", false,
+                                        "message", "Database is locked. Please try again in a few seconds."));
                             }
                             return ResponseEntity.status(500).body(Map.of(
-                                "success", false,
-                                "message", "Failed to delete stock: " + e.getMessage()
-                            ));
+                                    "success", false,
+                                    "message", "Failed to delete stock: " + e.getMessage()));
                         }
                     })
                     .orElse(ResponseEntity.status(404).body(Map.of(
-                        "success", false,
-                        "message", "Stock not found"
-                    )));
+                            "success", false,
+                            "message", "Stock not found")));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of(
-                "success", false,
-                "message", "Failed to delete stock: " + e.getMessage()
-            ));
+                    "success", false,
+                    "message", "Failed to delete stock: " + e.getMessage()));
         }
     }
 
