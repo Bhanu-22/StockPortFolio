@@ -32,6 +32,11 @@ public class StockController {
     private static final int PAGE_SIZE = 10;
 
     @GetMapping
+    public String welcome() {
+        return "welcome";
+    }
+
+    @GetMapping("/dashboard")
     public String index(Model model) {
         try {
             Page<Stock> stocksPage = stockRepository
@@ -153,20 +158,40 @@ public class StockController {
     }
 
     @DeleteMapping("/api/stocks/{id}")
-    public String deleteStock(@PathVariable Long id) {
+    @ResponseBody
+    public ResponseEntity<?> deleteStock(@PathVariable Long id) {
         try {
             return stockRepository.findById(id)
                     .map(stock -> {
                         try {
                             stockRepository.delete(stock);
-                            return "redirect:/?success=Stock deleted successfully";
+                            stockRepository.flush();
+                            return ResponseEntity.ok().body(Map.of(
+                                "success", true,
+                                "message", "Stock deleted successfully"
+                            ));
                         } catch (Exception e) {
-                            return "redirect:/?error=Failed to delete stock: " + e.getMessage();
+                            if (e.getCause() != null && e.getCause().getMessage().contains("locked")) {
+                                return ResponseEntity.status(423).body(Map.of(
+                                    "success", false,
+                                    "message", "Database is locked. Please try again in a few seconds."
+                                ));
+                            }
+                            return ResponseEntity.status(500).body(Map.of(
+                                "success", false,
+                                "message", "Failed to delete stock: " + e.getMessage()
+                            ));
                         }
                     })
-                    .orElse("redirect:/?error=Stock not found");
+                    .orElse(ResponseEntity.status(404).body(Map.of(
+                        "success", false,
+                        "message", "Stock not found"
+                    )));
         } catch (Exception e) {
-            return "redirect:/?error=Failed to delete stock: " + e.getMessage();
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to delete stock: " + e.getMessage()
+            ));
         }
     }
 
