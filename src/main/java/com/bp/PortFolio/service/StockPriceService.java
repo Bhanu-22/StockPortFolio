@@ -32,11 +32,15 @@ public class StockPriceService {
                 return cachedPrice.price;
             }
 
-            // Fetch new price
-            String url = UriComponentsBuilder.fromHttpUrl("https://www.alphavantage.co/query")
+            // Fetch new price using the new method
+            String url = UriComponentsBuilder.newInstance()
+                    .scheme("https")
+                    .host("www.alphavantage.co")
+                    .path("/query")
                     .queryParam("function", "GLOBAL_QUOTE")
                     .queryParam("symbol", symbol)
                     .queryParam("apikey", apiKey)
+                    .build()
                     .toUriString();
 
             String response = restTemplate.getForObject(url, String.class);
