@@ -1,4 +1,4 @@
-# Stock Portfolio Management System
+# Stock Portfolio Tracker
 
 ## Overview
 A robust Spring Boot application designed for efficient stock portfolio management and tracking. This system provides real-time stock price updates, portfolio analytics, and comprehensive investment tracking capabilities.
